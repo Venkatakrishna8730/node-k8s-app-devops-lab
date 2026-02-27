@@ -2,37 +2,43 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "venkatakrishnamyana/my-k8s-app:latest"
+        AWS_REGION = "ap-southeast-2"   // use your region
+        ACCOUNT_ID = "447924746913"
+        IMAGE_NAME = "devops-lab"
+        ECR_REPO = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}"
     }
 
     stages {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
+                sh '''
+                docker build -t $IMAGE_NAME .
+                '''
             }
         }
 
-        stage('Docker Login & Push') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                        docker push ${DOCKER_IMAGE}
-                    """
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
+        stage('Login to ECR') {
             steps {
                 sh '''
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
+                aws ecr get-login-password --region $AWS_REGION | \
+                docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                '''
+            }
+        }
+
+        stage('Tag image') {
+            steps {
+                sh '''
+                docker tag $IMAGE_NAME:latest $ECR_REPO:latest
+                '''
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                sh '''
+                docker push $ECR_REPO:latest
                 '''
             }
         }
@@ -40,7 +46,7 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment Successful 🚀'
+            echo 'Image pushed 🚀'
         }
         failure {
             echo 'Pipeline Failed ❌'
