@@ -6,6 +6,8 @@ pipeline {
         ACCOUNT_ID = "447924746913"
         IMAGE_NAME = "devops-lab"
         ECR_REPO = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}"
+
+        AWS_CREDS = credentials('aws-creds')
     }
 
     stages {
@@ -21,6 +23,9 @@ pipeline {
         stage('Login to ECR') {
             steps {
                 sh '''
+                export AWS_ACCESS_KEY_ID=$AWS_CREDS_USR
+                export AWS_SECRET_ACCESS_KEY=$AWS_CREDS_PSW
+                
                 aws ecr get-login-password --region $AWS_REGION | \
                 docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
                 '''
